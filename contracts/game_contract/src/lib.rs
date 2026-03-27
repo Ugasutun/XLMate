@@ -4,8 +4,8 @@ use soroban_sdk::{
     Address, Env, Map, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
     symbol_short,
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror,
-    symbol_short, Address, Bytes, BytesN, Env, Map, Symbol, Vec,
+    Address, Bytes, BytesN, Env, Map, Symbol, Vec, contract, contracterror, contractimpl,
+    contracttype, symbol_short,
 };
 
 // Game states
@@ -50,10 +50,10 @@ const ESCROW: Symbol = symbol_short!("ESCROW");
 const TOKEN_CONTRACT: Symbol = symbol_short!("TOKEN");
 
 // Puzzle-reward storage keys
-const ADMIN_KEY:  Symbol = symbol_short!("ADMIN_KEY");  // 32-byte ED25519 backend pubkey
-const TREASURY:   Symbol = symbol_short!("TREASURY");   // i128 treasury reserve
-const BALANCES:   Symbol = symbol_short!("BALANCES");   // Map<Address, i128> user balances
-const USED_NONCE: Symbol = symbol_short!("NONCES");     // Map<u64, bool> replay protection
+const ADMIN_KEY: Symbol = symbol_short!("ADMIN_KEY"); // 32-byte ED25519 backend pubkey
+const TREASURY: Symbol = symbol_short!("TREASURY"); // i128 treasury reserve
+const BALANCES: Symbol = symbol_short!("BALANCES"); // Map<Address, i128> user balances
+const USED_NONCE: Symbol = symbol_short!("NONCES"); // Map<u64, bool> replay protection
 
 // Contract errors
 #[contracterror]
@@ -375,10 +375,18 @@ impl GameContract {
     }
 
     // Payout tournament winnings to multiple winners
-    pub fn payout_tournament(env: Env, game_id: u64, winners: Vec<Address>, percentages: Vec<u32>) -> Result<(), ContractError> {
-        let mut games: Map<u64, Game> = env.storage().instance().get(&GAMES)
+    pub fn payout_tournament(
+        env: Env,
+        game_id: u64,
+        winners: Vec<Address>,
+        percentages: Vec<u32>,
+    ) -> Result<(), ContractError> {
+        let mut games: Map<u64, Game> = env
+            .storage()
+            .instance()
+            .get(&GAMES)
             .ok_or(ContractError::GameNotFound)?;
-        
+
         let game = games.get(game_id).ok_or(ContractError::GameNotFound)?;
 
         // Validate game state
@@ -404,7 +412,11 @@ impl GameContract {
             return Err(ContractError::InvalidPercentage);
         }
 
-        let mut escrow: Map<Address, i128> = env.storage().instance().get(&ESCROW).unwrap_or(Map::new(&env));
+        let mut escrow: Map<Address, i128> = env
+            .storage()
+            .instance()
+            .get(&ESCROW)
+            .unwrap_or(Map::new(&env));
 
         // Validate sufficient balances before any debit to prevent negative escrow and double payouts
         let player1_escrow = escrow.get(game.player1.clone()).unwrap_or(0);
@@ -414,7 +426,7 @@ impl GameContract {
 
         let mut player2_escrow = 0;
         let mut total_pool = game.wager_amount;
-        
+
         if let Some(ref player2) = game.player2 {
             player2_escrow = escrow.get(player2.clone()).unwrap_or(0);
             if player2_escrow < game.wager_amount {
@@ -435,7 +447,7 @@ impl GameContract {
         for i in 0..winners.len() {
             let winner = winners.get(i).unwrap();
             let percentage = percentages.get(i).unwrap();
-            
+
             // Calculate payout based on percentage of total pool
             let payout_amount = (total_pool * percentage as i128) / 100;
             distributed += payout_amount;
@@ -493,6 +505,8 @@ impl GameContract {
             .instance()
             .get(&ESCROW)
             .unwrap_or(Map::new(env));
+
+        // Return wagers to both players
         let player1_escrow = escrow.get(game.player1.clone()).unwrap_or(0);
         escrow.set(game.player1.clone(), player1_escrow - game.wager_amount);
 
@@ -524,6 +538,12 @@ impl GameContract {
         let winner_escrow = escrow.get(winner.clone()).unwrap_or(0);
         escrow.set(winner.clone(), winner_escrow + (game.wager_amount * 2));
 
+
+        // Transfer both wagers to winner
+        let winner_escrow = escrow.get(winner.clone()).unwrap_or(0);
+        escrow.set(winner.clone(), winner_escrow + (game.wager_amount * 2));
+
+        // Remove from loser's escrow
         let loser = if winner == &game.player1 {
             game.player2.as_ref().ok_or(ContractError::GameFull)?
         } else {
@@ -551,6 +571,12 @@ impl GameContract {
         let winner_escrow = escrow.get(winner.clone()).unwrap_or(0);
         escrow.set(winner.clone(), winner_escrow + (game.wager_amount * 2));
 
+
+        // Transfer both wagers to winner
+        let winner_escrow = escrow.get(winner.clone()).unwrap_or(0);
+        escrow.set(winner.clone(), winner_escrow + (game.wager_amount * 2));
+
+        // Remove from loser's escrow
         let loser = if winner == &game.player1 {
             game.player2.as_ref().ok_or(ContractError::GameFull)?
         } else {
@@ -670,18 +696,15 @@ impl GameContract {
 
         // Verify the ED25519 signature — Soroban panics on failure.
         // The panic satisfies the "panics with Unauthorized" acceptance criterion.
-        env.crypto().ed25519_verify(&admin_pubkey, &digest_bytes, &signature);
+        env.crypto()
+            .ed25519_verify(&admin_pubkey, &digest_bytes, &signature);
 
         // ── 4. Mark nonce as used (state-before-interaction) ────────────────
         nonces.set(nonce, true);
         env.storage().instance().set(&USED_NONCE, &nonces);
 
         // ── 5. Deduct from Treasury ──────────────────────────────────────────
-        let treasury: i128 = env
-            .storage()
-            .instance()
-            .get(&TREASURY)
-            .unwrap_or(0);
+        let treasury: i128 = env.storage().instance().get(&TREASURY).unwrap_or(0);
 
         if treasury < reward_amount {
             panic!("Insufficient treasury");
@@ -703,10 +726,8 @@ impl GameContract {
         env.storage().instance().set(&BALANCES, &balances);
 
         // ── 7. Emit event ────────────────────────────────────────────────────
-        env.events().publish(
-            (symbol_short!("pzl_rwd"), recipient.clone()),
-            reward_amount,
-        );
+        env.events()
+            .publish((symbol_short!("pzl_rwd"), recipient.clone()), reward_amount);
 
         Ok(())
     }
@@ -778,6 +799,7 @@ mod tests {
     };
     use ed25519_dalek::{Signer, SigningKey};
     use rand::rngs::OsRng;
+    use soroban_sdk::{Bytes, BytesN, Env, testutils::Address as _};
 
     // ────────────────────────────────────────────────────────────────────────
     // Helper: build the same payload the contract builds, sign it off-chain.
@@ -819,10 +841,7 @@ mod tests {
     // Helper: register + initialize the contract with a generated admin key.
     // Returns (client, signing_key, verifying_key_bytes).
     // ────────────────────────────────────────────────────────────────────────
-    fn setup(
-        env: &Env,
-        treasury_amount: i128,
-    ) -> (GameContractClient, SigningKey) {
+    fn setup(env: &Env, treasury_amount: i128) -> (GameContractClient, SigningKey) {
         let contract_id = env.register_contract(None, GameContract);
         let client = GameContractClient::new(env, &contract_id);
 
@@ -904,4 +923,3 @@ mod tests {
 
 #[cfg(test)]
 mod test;
-
