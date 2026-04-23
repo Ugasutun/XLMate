@@ -7,6 +7,7 @@ import { FaTrophy, FaStar, FaCheck, FaTimes, FaRedo, FaArrowLeft } from "react-i
 import { useAppContext } from "@/context/walletContext";
 import { useToast } from "@/components/ui/toast";
 import { Web3StatusBar } from "@/components/Web3StatusBar";
+import { useTrackedTransaction } from "@/hook/useTrackedTransaction";
 
 const ChessboardComponent = dynamic(
   () => import("@/components/chess/ChessboardComponent"),
@@ -84,6 +85,12 @@ export default function PuzzlesPage() {
 
   const { address, status: walletStatus } = useAppContext();
   const { addToast } = useToast();
+
+  const { execute: executeClaim } = useTrackedTransaction({
+    type: "claim",
+    label: `Claim ${rewardAmount || "0.01"} XLM reward`,
+    amount: String(rewardAmount),
+  });
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -171,25 +178,18 @@ export default function PuzzlesPage() {
       return;
     }
     setIsClaiming(true);
-    try {
+
+    const result = await executeClaim(async () => {
       // Simulate on-chain reward claim — in production this would invoke a Soroban contract
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      addToast({
-        severity: "success",
-        title: "Reward Claimed!",
-        detail: `${rewardAmount} XLM has been sent to your wallet.`,
-      });
+      return true;
+    });
+
+    setIsClaiming(false);
+    if (result !== undefined) {
       setShowReward(false);
-    } catch {
-      addToast({
-        severity: "error",
-        title: "Claim Failed",
-        detail: "Could not claim reward. Please try again.",
-      });
-    } finally {
-      setIsClaiming(false);
     }
-  }, [walletStatus, address, rewardAmount, addToast]);
+  }, [walletStatus, address, addToast, executeClaim]);
 
   const completionRate = Math.round((completedPuzzles.size / MOCK_PUZZLES.length) * 100);
 

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useAppContext } from "@/context/walletContext";
+import { useTransactionContext } from "@/context/transactionContext";
 
 /**
  * Web3StatusBar — A compact indicator shown at the top of the main content area.
@@ -10,6 +11,7 @@ import { useAppContext } from "@/context/walletContext";
  */
 export function Web3StatusBar() {
   const { address, status } = useAppContext();
+  const { activeCount } = useTransactionContext();
 
   const statusConfig: Record<
     string,
@@ -59,6 +61,15 @@ export function Web3StatusBar() {
         <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" aria-hidden="true" />
         Testnet
       </span>
+      {activeCount > 0 && (
+        <>
+          <span className="text-gray-600">|</span>
+          <span className="text-xs text-blue-400 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" aria-hidden="true" />
+            {activeCount} tx
+          </span>
+        </>
+      )}
     </div>
   );
 }

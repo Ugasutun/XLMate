@@ -4,6 +4,7 @@ import React, { useState, useCallback } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useAppContext } from "@/context/walletContext";
 import { useToast } from "@/components/ui/toast";
+import { useTrackedTransaction } from "@/hook/useTrackedTransaction";
 
 interface WalletConnectModalProps {
   isOpen: boolean;
@@ -28,6 +29,13 @@ export function WalletConnectModal({
   const [showXlmSend, setShowXlmSend] = useState(false);
   const [xlmDestination, setXlmDestination] = useState("");
   const [xlmAmount, setXlmAmount] = useState("");
+
+  const { execute: executeTrackedTx } = useTrackedTransaction({
+    type: "payment",
+    label: `Send ${xlmAmount || "?"} XLM`,
+    amount: xlmAmount,
+    destination: xlmDestination,
+  });
 
   const handleConnect = useCallback(async () => {
     setIsConnecting(true);
@@ -73,31 +81,24 @@ export function WalletConnectModal({
   const handleSendXLM = useCallback(async () => {
     if (!address || !xlmDestination || !xlmAmount) return;
     setTxStep("pending");
-    try {
-      await sendXLM(xlmDestination, xlmAmount);
+
+    const result = await executeTrackedTx(async () => {
+      return await sendXLM(xlmDestination, xlmAmount);
+    });
+
+    if (result !== undefined) {
       setTxStep("success");
-      addToast({
-        severity: "success",
-        title: "Transaction Sent",
-        detail: `${xlmAmount} XLM sent successfully.`,
-      });
       setTimeout(() => {
         setShowXlmSend(false);
         setXlmDestination("");
         setXlmAmount("");
         setTxStep("idle");
       }, 2000);
-    } catch (err) {
+    } else {
       setTxStep("error");
-      addToast({
-        severity: "error",
-        title: "Transaction Failed",
-        detail:
-          err instanceof Error ? err.message : "Transaction could not be sent.",
-      });
       setTimeout(() => setTxStep("idle"), 3000);
     }
-  }, [address, xlmDestination, xlmAmount, sendXLM, addToast]);
+  }, [address, xlmDestination, xlmAmount, sendXLM, executeTrackedTx]);
 
   const truncateAddress = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-4)}`;

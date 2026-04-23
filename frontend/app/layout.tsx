@@ -4,6 +4,7 @@ import ClientRoot from "@/components/ClientRoot";
 import { AppProvider } from "@/context/walletContext";
 import { MatchmakingProvider } from "@/context/matchmakingContext";
 import { ToastProvider } from "@/components/ui/toast";
+import { TransactionProvider } from "@/context/transactionContext";
 import { ThemeProvider } from "next-themes";
 
 export const metadata: Metadata = {
@@ -29,7 +30,9 @@ export default function RootLayout({
           <AppProvider>
             <MatchmakingProvider>
               <ToastProvider>
-                <ClientRoot>{children}</ClientRoot>
+                <TransactionProvider>
+                  <ClientRoot>{children}</ClientRoot>
+                </TransactionProvider>
               </ToastProvider>
             </MatchmakingProvider>
           </AppProvider>
